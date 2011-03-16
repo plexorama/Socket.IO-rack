@@ -47,11 +47,7 @@ module Palmade::SocketIoRack
     end
 
     def persistence
-      if defined?(@persistence)
-        @persistence
-      else
-        @persistence = Palmade::SocketIoRack::Persistence.new(@options[:persistence])
-      end
+      @persistence ||= Palmade::SocketIoRack::Persistence.new(@options[:persistence])
     end
 
     def call(env)
