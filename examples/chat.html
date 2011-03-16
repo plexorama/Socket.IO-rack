@@ -1,14 +1,15 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
     <title>socket.io client test</title>
         
-    <script src="/json.js"></script> <!-- for ie -->
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="/javascripts/json.js"></script>
+    <script src="/javascripts/socket.io.js"></script>
   </head>
   <body>
     
     <script>
+      io.setPath('/javascripts/socket.io/');
       function message(obj){
         var el = document.createElement('p');
         if ('announcement' in obj) el.innerHTML = '<em>' + esc(obj.announcement) + '</em>';
@@ -30,9 +31,10 @@
         return msg.replace(/</g, '&lt;').replace(/>/g, '&gt;');
       };
       
-      var socket = new io.Socket(null, {port: 8080, rememberTransport: false});
+      var socket = new io.Socket("localhost", {resource: 'chat', transports: [ 'websocket', 'xhr-multipart', 'xhr-polling' ]});
       socket.connect();
-      socket.on('message', function(obj){
+      socket.on('message', function(data){
+        var obj = JSON.parse(data);
         if ('buffer' in obj){
           document.getElementById('form').style.display='block';
           document.getElementById('chat').innerHTML = '';
@@ -64,6 +66,5 @@
       #form input[type=submit]:hover { background: #A2A2A2; }
       #form input[type=submit]:active { position: relative; top: 2px; }
     </style>
-    
   </body>
 </html>

@@ -12,22 +12,19 @@ require 'thin'
 gem 'redis'
 require 'redis'
 
+gem 'json'
+require 'json'
+
 require 'palmade/socket_io_rack'
-# Thin.send(:include, Palmade::SocketIoRack::Mixins::Thin)
+Thin.send(:include, Palmade::SocketIoRack::Mixins::Thin)
 
-class Firehose < Palmade::SocketIoRack::Base
+class Chat < Palmade::SocketIoRack::Base
   def on_connect
-    EM.add_timer(30) do
-      reply "This message should show-up 30 secs later"
-    end
-
-    EM.add_timer(60) do
-      reply "This message should show-up 60 secs later"
-    end
+    reply({:buffer => [{:announcement => 'Welcome to the chat room'}]}.to_json)
   end
 
   def on_message(msg)
-    reply "Hello #{msg}"
+    reply({:message => ['sessionid', msg]}.to_json)
   end
 end
 
@@ -37,7 +34,7 @@ Thin::Server.start('127.0.0.1', 3000) do
   map '/' do
     use(Palmade::SocketIoRack::Middleware,
         :resources =>  {
-          '/firehose' => 'Firehose'
+          '/chat' => 'Chat'
         })
 
     run Rack::File.new(File.join(siorack_dir, 'examples'))
