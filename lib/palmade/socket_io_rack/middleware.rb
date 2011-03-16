@@ -73,32 +73,28 @@ module Palmade::SocketIoRack
         pi = Rack::Utils.unescape(env[CPATH_INFO])
 
         resource_paths.each do |rpath|
-          if pi.index(rpath) == 0
-            if pi =~ /\A#{rpath}\/([^\/]+)(\/.*)?\Z/
-              transport = $~[1]
-              transport_options = $~[2]
+          if pi =~ /\A#{rpath}\/([^\/]+)(\/.*)?\Z/
+            transport = $~[1]
+            transport_options = $~[2]
 
-              env[CSOCKET_IO_RESOURCE] = rpath
-              env[CSOCKET_IO_TRANSPORT] = transport
-              env[CSOCKET_IO_TRANSPORT_OPTIONS] = transport_options
+            env[CSOCKET_IO_RESOURCE] = rpath
+            env[CSOCKET_IO_TRANSPORT] = transport
+            env[CSOCKET_IO_TRANSPORT_OPTIONS] = transport_options
 
-              if SUPPORTED_TRANSPORTS.include?(transport)
-                case transport
-                when Cwebsocket
-                  performed, response = perform_websocket(env, rpath, transport, transport_options)
-                when Cxhrpolling
-                  performed, response = perform_xhr_polling(env, rpath, transport, transport_options)
-                when Cxhrmultipart
-                  performed, response = perform_xhr_multipart(env, rpath, transport, transport_options)
-                end
-              else
-                logger.error { "!!! Socket.IO ERROR: Transport not supported #{rpath} #{transport} #{transport_options}" }
-                performed, response = true, not_found("Transport not supported: #{transport}, possible #{SUPPORTED_TRANSPORTS.join(', ')}")
-              end
-
-              # only perform the first match
-              break if performed
+            case transport
+            when Cwebsocket
+              performed, response = perform_websocket(env, rpath, transport, transport_options)
+            when Cxhrpolling
+              performed, response = perform_xhr_polling(env, rpath, transport, transport_options)
+            when Cxhrmultipart
+              performed, response = perform_xhr_multipart(env, rpath, transport, transport_options)
+            else
+              logger.error { "!!! Socket.IO ERROR: Transport not supported #{rpath} #{transport} #{transport_options}" }
+              performed, response = true, not_found("Transport not supported: #{transport}, possible #{SUPPORTED_TRANSPORTS.join(', ')}")
             end
+
+            # only perform the first match
+            break if performed
           end
         end
       end
