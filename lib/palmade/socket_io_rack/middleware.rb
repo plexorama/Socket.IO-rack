@@ -56,10 +56,10 @@ module Palmade::SocketIoRack
 
     def call(env)
       performed, response = call_resources(env)
-      unless performed
-        @app.call(env)
-      else
+      if performed
         response
+      else
+        @app.call(env)
       end
     end
 

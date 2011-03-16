@@ -12,7 +12,7 @@
       if(true) {
         socket = new io.Socket("localhost",
                                { resource: 'firehose',
-                                 transports: [ 'xhr-multipart', 'xhr-polling' ]
+                                 transports: [ 'websocket', 'xhr-multipart', 'xhr-polling' ]
                                });
 
         socket.connect();

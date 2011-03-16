@@ -13,7 +13,7 @@ gem 'redis'
 require 'redis'
 
 require 'palmade/socket_io_rack'
-# Thin.send(:include, Palmade::SocketIoRack::Mixins::Thin)
+Thin.send(:include, Palmade::SocketIoRack::Mixins::Thin)
 
 class Firehose < Palmade::SocketIoRack::Base
   def on_connect
