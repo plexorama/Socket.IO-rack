@@ -8,7 +8,7 @@ module Palmade::SocketIoRack
         require 'redis'
         require 'time'
 
-        @persistence = Palmade::SocketIoRack::Persistence.new
+        @persistence = Palmade::SocketIoRack::Persistence.new(:store => :memory)
       end
 
       context "trivial behaviour" do
@@ -16,7 +16,7 @@ module Palmade::SocketIoRack
           Palmade::SocketIoRack::Persistence::MemoryStore.new
         end
 
-        it "should use memory store (as default)" do
+        it "should use memory store (when specified)" do
           store = @persistence.store
 
           store.should be_an_instance_of Palmade::SocketIoRack::Persistence::MemoryStore

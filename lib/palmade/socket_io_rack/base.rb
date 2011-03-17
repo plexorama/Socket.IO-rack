@@ -87,7 +87,7 @@ module Palmade::SocketIoRack
 
       # let's remove the reference to the transport, to allow the
       # garbase collector to reclaim it
-      @sessions.delete sid
+      @sessions[sid][:transport] = nil
     end
 
     def fire_heartbeat(sid, cycle_count)
