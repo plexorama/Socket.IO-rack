@@ -114,6 +114,17 @@ module Palmade::SocketIoRack
       end
     end
 
+    def broadcast(*msgs)
+      @sessions.each_key do |sid|
+        reply sid, msgs
+      end
+    end
+    def multicast(sids, *msgs)
+      sids.each do |sid|
+        reply sid, msgs
+      end if sids
+    end
+
     def deferred_reply(sid, *msgs)
       @sessions[sid][:session].push_outbox encode_messages(msgs.to_a.flatten)
     end
