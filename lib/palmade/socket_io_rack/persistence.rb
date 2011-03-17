@@ -7,7 +7,7 @@ module Palmade::SocketIoRack
     DEFAULT_OPTIONS = {
       :cache_expiry => 60 * 60, # default: 1 hr
       :cache_key => 'Socket.IO-rack/persistence'.freeze,
-      :store => :memory,
+      :store => :redis,
       :sidbits => 128
     }
 

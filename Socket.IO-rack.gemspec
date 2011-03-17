@@ -9,6 +9,7 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'rack'
   s.add_development_dependency 'thin'
   s.add_development_dependency 'redis', '>= 2.0.5'
+  s.add_development_dependency 'json'
   s.required_rubygems_version = Gem::Requirement.new(">= 1.2") if s.respond_to? :required_rubygems_version=
   s.authors = ["palmade"]
   s.date = %q{2010-10-10}

@@ -1,3 +1,7 @@
+class Palmade::SocketIoRack::Base
+  attr_reader :sessions
+end
+
 class XhrPollingTest < Test::Unit::TestCase
   def setup
     gem 'eventmachine', '>= 0.12.10'
@@ -19,30 +23,28 @@ class XhrPollingTest < Test::Unit::TestCase
           assert(result.last.size == 3, "final response is of wrong size")
         end
 
-        xpt = nil
-        assert_nothing_raised { xpt = b.initialize_transport!("xhr-polling") }
-        assert(xpt.kind_of?(Palmade::SocketIoRack::Transports::XhrPolling), "returned the wrong transport")
-
         response = nil
         performed = false
-        performed, response = xpt.handle_request(env, nil, p)
+        assert_nothing_raised { performed, response = b.handle_request(env, 'xhr-polling', nil, p) }
+        assert(b.sessions.count == 1)
+
+        sid = nil
+        b.sessions.each_key { |id| sid = id }
+        xpt = b.sessions[sid][:transport]
+        assert(xpt.kind_of?(Palmade::SocketIoRack::Transports::XhrPolling), "returned the wrong transport")
 
         assert(performed, "original request not performed")
         assert(response.first == -1, "response is not an async response")
 
-        session_id = b.session.session_id
+        session_id = b.sessions[sid][:session].session_id
         assert(session_id.kind_of?(String), "wrong session id value")
 
-        b.reply "Hello", "World"
-        b.reply "More", "Hello", "World"
+        b.reply sid, "Hello", "World"
+        b.reply sid, "More", "Hello", "World"
 
         EM.next_tick do
           assert(!xpt.connected?, "xpt was not disconnected")
-          b.reply "This", "is", "for", "something", "later"
-
-          xpt = nil
-          assert_nothing_raised { xpt = b.initialize_transport!("xhr-polling") }
-          assert(xpt.kind_of?(Palmade::SocketIoRack::Transports::XhrPolling), "returned the wrong transport")
+          b.reply sid, "This", "is", "for", "something", "later"
 
           env = MockWebRequest.new("REQUEST_METHOD" => "GET") do |result|
             assert(result.first == 200, "not an HTTP 200 response")
@@ -50,7 +52,6 @@ class XhrPollingTest < Test::Unit::TestCase
 
             EM.next_tick do
               assert(!xpt.connected?, "xpt was not disconnected (resume)")
-
               EM.stop
             end
           end
@@ -58,12 +59,12 @@ class XhrPollingTest < Test::Unit::TestCase
           to = "/#{session_id}"
           response = nil
           performed = false
-          performed, response = xpt.handle_request(env, to, p)
+          assert_nothing_raised { performed, response = b.handle_request(env, 'xhr-polling', to, p) }
 
           assert(performed, "resumed request not performed")
           assert(response.first == -1, "response is not async (resume)")
 
-          b.reply "This", "is", "a", "reply", "from", "the", "resumed", "sessions"
+          b.reply sid, "This", "is", "a", "reply", "from", "the", "resumed", "sessions"
         end
       end
     end

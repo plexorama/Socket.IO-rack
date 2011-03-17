@@ -12,22 +12,36 @@ require 'thin'
 gem 'redis'
 require 'redis'
 
+gem 'json'
+require 'json'
+
 require 'palmade/socket_io_rack'
-# Thin.send(:include, Palmade::SocketIoRack::Mixins::Thin)
+Thin.send(:include, Palmade::SocketIoRack::Mixins::Thin)
 
-class Firehose < Palmade::SocketIoRack::Base
-  def on_connect
-    EM.add_timer(30) do
-      reply "This message should show-up 30 secs later"
-    end
+class Chat < Palmade::SocketIoRack::Base
+  def initialize(options = {})
+    super(options)
+    @buffer = []
+  end
 
-    EM.add_timer(60) do
-      reply "This message should show-up 60 secs later"
+  def on_connect(sid)
+    EM.add_timer(1) do
+      reply(sid, {:buffer => @buffer}.to_json)
+      broadcast({:announcement => "#{sid} has joined the chat room"}.to_json)
     end
   end
 
-  def on_message(msg)
-    reply "Hello #{msg}"
+  def on_message(sid, msg)
+    message = {:message => [sid, msg]}
+    @buffer << message
+    @buffer.shift if @buffer.count > 15
+    send_to = @sessions.keys
+    send_to.delete sid
+    multicast send_to, message.to_json
+  end
+
+  def on_disconnected(sid)
+    broadcast({:announcement => "#{sid} has left the chat room (disconnected)"}.to_json)
   end
 end
 
@@ -37,7 +51,7 @@ Thin::Server.start('127.0.0.1', 3000) do
   map '/' do
     use(Palmade::SocketIoRack::Middleware,
         :resources =>  {
-          '/firehose' => 'Firehose'
+          '/chat' => 'Chat'
         })
 
     run Rack::File.new(File.join(siorack_dir, 'examples'))

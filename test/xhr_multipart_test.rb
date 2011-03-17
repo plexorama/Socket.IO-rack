@@ -1,3 +1,7 @@
+class Palmade::SocketIoRack::Base
+  attr_reader :sessions
+end
+
 class XhrMultipartTest < Test::Unit::TestCase
   def setup
     gem 'eventmachine', '>= 0.12.10'
@@ -19,6 +23,7 @@ class XhrMultipartTest < Test::Unit::TestCase
         stop = false
         env = nil
         xpt = nil
+        sid = nil
         next_request = nil
 
         env = MockWebRequest.new("REQUEST_METHOD" => "GET") do |result|
@@ -30,7 +35,7 @@ class XhrMultipartTest < Test::Unit::TestCase
             assert(env.data.size == 2, "initial header response is not right")
             assert(env.data.first == "--socketio\n", "could not see first multipart boundary")
 
-            b.reply("Yet another reply")
+            b.reply(sid, "Yet another reply")
             assert(env.data.size == 3, "additional reply was not sent to the connection")
 
             xpt.maxed_outbound_timer
@@ -40,17 +45,19 @@ class XhrMultipartTest < Test::Unit::TestCase
           end
         end
 
-        assert_nothing_raised { xpt = b.initialize_transport!("xhr-multipart") }
-        assert(xpt.kind_of?(Palmade::SocketIoRack::Transports::XhrMultipart), "returned the wrong transport")
-
         response = nil
         performed = false
-        performed, response = xpt.handle_request(env, nil, p)
+        assert_nothing_raised { performed, response = b.handle_request(env, 'xhr-multipart', nil, p) }
+        assert(b.sessions.count == 1)
+
+        b.sessions.each_key { |id| sid = id }
+        xpt = b.sessions[sid][:transport]
+        assert(xpt.kind_of?(Palmade::SocketIoRack::Transports::XhrMultipart), "returned the wrong transport")
 
         assert(performed, "original request not performed")
         assert(response.first == -1, "response is not an async response")
 
-        session_id = b.session.session_id
+        session_id = b.sessions[sid][:session].session_id
         assert(session_id.kind_of?(String), "wrong session id value")
 
         next_request = lambda do
@@ -63,7 +70,7 @@ class XhrMultipartTest < Test::Unit::TestCase
               assert(env.data.size == 1, "initial header response is not right")
               assert(env.data.first == "--socketio\n", "could not see first multipart boundary")
 
-              b.reply("More replies")
+              b.reply(sid, "More replies")
               assert(env.data.size == 2, "additional reply was not sent to the connection")
 
               xpt.maxed_outbound_timer
@@ -73,13 +80,16 @@ class XhrMultipartTest < Test::Unit::TestCase
             end
           end
 
-          assert_nothing_raised { xpt = b.initialize_transport!("xhr-multipart") }
-          assert(xpt.kind_of?(Palmade::SocketIoRack::Transports::XhrMultipart), "returned the wrong transport")
-
           response = nil
           performed = false
           to = "/#{session_id}"
-          performed, response = xpt.handle_request(env, to, p)
+          assert_nothing_raised { performed, response = b.handle_request(env, 'xhr-multipart', to, p) }
+          assert(b.sessions.count == 1)
+
+          sid = nil
+          b.sessions.each_key { |id| sid = id }
+          xpt = b.sessions[sid][:transport]
+          assert(xpt.kind_of?(Palmade::SocketIoRack::Transports::XhrMultipart), "returned the wrong transport")
 
           assert(performed, "original request not performed")
           assert(response.first == -1, "response is not an async response")
