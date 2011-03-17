@@ -20,11 +20,13 @@ Thin.send(:include, Palmade::SocketIoRack::Mixins::Thin)
 
 class Chat < Palmade::SocketIoRack::Base
   def on_connect
-    reply({:buffer => [{:announcement => 'Welcome to the chat room'}]}.to_json)
+    EM.add_timer(1) do
+      reply({:buffer => [{:announcement => 'Welcome to the chat room'}]}.to_json)
+    end
   end
 
   def on_message(msg)
-    reply({:message => ['sessionid', msg]}.to_json)
+    reply({:message => [@session.session_id, msg]}.to_json)
   end
 end
 

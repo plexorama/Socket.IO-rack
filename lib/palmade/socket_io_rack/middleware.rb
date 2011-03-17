@@ -36,7 +36,7 @@ module Palmade::SocketIoRack
 
     def initialize(app, options = { })
       @options = DEFAULT_OPTIONS.merge(options)
-      @resources = options[:resources]
+      @resources = @options[:resources]
       @resource_paths = nil
 
       @app = app
@@ -149,14 +149,7 @@ module Palmade::SocketIoRack
     end
 
     def resource_paths
-      if @resource_paths.nil?
-        @resource_paths = [ ]
-        @resources.keys.each do |r|
-          @resource_paths.push(r)
-        end
-      else
-        @resource_paths
-      end
+      @resource_paths ||= @resources.keys
     end
 
     def not_found(msg)
