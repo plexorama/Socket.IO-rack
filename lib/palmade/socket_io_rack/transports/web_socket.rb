@@ -31,7 +31,7 @@ module Palmade::SocketIoRack
         # see:
         # http://github.com/palmade/puppet_master.
         if !session.nil?
-          @resource.initialize_session!(@session = session)
+          @resource.initialize_session!(self, @session = session)
 
           [ true, [ 101,
                     {

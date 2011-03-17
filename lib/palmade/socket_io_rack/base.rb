@@ -4,9 +4,6 @@ module Palmade::SocketIoRack
   class Base
     DEFAULT_OPTIONS = { }
 
-    attr_reader :session
-    attr_reader :transport
-
     Cxhrpolling = "xhr-polling".freeze
     Cwebsocket = "websocket".freeze
     Cxhrmultipart = "xhr-multipart".freeze
@@ -17,111 +14,112 @@ module Palmade::SocketIoRack
 
     def initialize(options = { })
       @options = DEFAULT_OPTIONS.merge(options)
-      @transport = nil
-      @session = nil
+      @sessions = {}
     end
 
-    def initialize_transport!(tn, to = { })
-      case tn
+    def handle_request(env, transport_class, transport_options, persistence)
+      case transport_class
       when Cwebsocket
-        @transport = Transports::WebSocket.new(self, to)
+        transport = Transports::WebSocket.new self
       when Cxhrpolling
-        @transport = Transports::XhrPolling.new(self, to)
+        transport = Transports::XhrPolling.new self
       when Cxhrmultipart
-        @transport = Transports::XhrMultipart.new(self, to)
+        transport = Transports::XhrMultipart.new self
       else
-        raise "Unsupported transport #{tn}"
+        raise "Unsupported transport #{transport_class}"
       end
-
-      @transport
+      transport.handle_request env, transport_options, persistence
     end
 
-    def initialize_session!(sess)
-      @session = sess
+    def initialize_session!(transport, sess)
+      @sessions[sess.session_id] = {:session => sess, :transport => transport}
     end
 
-    def on_message(msg); end # do nothing
-    def on_connect; end # do nothing
-    def on_resume_connection; end # do nothing
-    def on_close; end # do nothing
-    def on_disconnected; end # do nothing
-    def on_heartbeat(cycle_count); end # do nothing
+    def on_message(sid, msg); end # do nothing
+    def on_connect(sid); end # do nothing
+    def on_resume_connection(sid); end # do nothing
+    def on_close(sid); end # do nothing
+    def on_disconnected(sid); end # do nothing
+    def on_heartbeat(sid, cycle_count); end # do nothing
 
-    def fire_connect
-      on_connect
-      reply(session.session_id)
+    def fire_connect(sid)
+      on_connect sid
+      reply sid, sid
 
-      @session.persist!
+      @sessions[sid][:session].persist!
     end
 
-    def fire_resume_connection
-      on_resume_connection
+    def fire_resume_connection(sid)
+      on_resume_connection sid
 
-      @session.renew!
+      @sessions[sid][:session].renew!
     end
 
-    def fire_message(data)
-      msgs = decode_messages(data)
+    def fire_message(sid, data)
+      msgs = decode_messages data
       msgs.each do |msg|
         case msg[0,3]
         when Chframe
           hb = msg[3..-1]
 
           # puts "Got HB: #{hb}"
+          session = @sessions[sid][:session]
           if session['heartbeat'] == hb
             # just got heartbeat
-            session.delete('heartbeat')
+            session.delete 'heartbeat'
           else
             # TODO: Add support for wrong heartbeat message
           end
         else
-          on_message(msg)
+          on_message sid, msg
         end
       end
 
-      @session.renew!
+      @sessions[sid][:session].renew!
     end
 
-    def fire_close
-      on_close
+    def fire_close(sid)
+      on_close sid
     end
 
-    def fire_disconnected
-      on_disconnected
+    def fire_disconnected(sid)
+      on_disconnected sid
 
       # let's remove the reference to the transport, to allow the
       # garbase collector to reclaim it
-      @transport = nil
+      @sessions.delete sid
     end
 
-    def fire_heartbeat(cycle_count)
-      on_heartbeat(cycle_count)
+    def fire_heartbeat(sid, cycle_count)
+      on_heartbeat sid, cycle_count
 
+      session = @sessions[sid][:session]
       unless session.include?('heartbeat')
         hb = Time.now.to_s
         session['heartbeat'] = hb
 
         # puts "Sending HB: #{hb}"
-        reply("#{Chframe}#{hb}")
+        reply sid, "#{Chframe}#{hb}"
       else
         # TODO: Add support for handling if a previously sent
         # heartbeat did not get a reply
       end
     end
 
-    def reply(*msgs)
-      if connected?
-        transport.send_data(encode_messages(msgs.to_a.flatten))
+    def reply(sid, *msgs)
+      if connected?(sid)
+        @sessions[sid][:transport].send_data encode_messages(msgs.to_a.flatten)
       else
-        deferred_reply(*msgs)
+        deferred_reply sid, *msgs
       end
     end
 
-    def deferred_reply(*msgs)
-      session.push_outbox(encode_messages(msgs.to_a.flatten))
+    def deferred_reply(sid, *msgs)
+      @sessions[sid][:session].push_outbox encode_messages(msgs.to_a.flatten)
     end
 
-    def connected?
+    def connected?(sid)
+      transport = @sessions[sid][:transport]
       !transport.nil? && transport.connected?
     end
 
