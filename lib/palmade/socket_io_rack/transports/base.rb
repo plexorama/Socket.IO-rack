@@ -53,18 +53,18 @@ module Palmade::SocketIoRack
         @connected = true
 
         if @session.new?
-          @resource.fire_connect
-        elsif
-          @resource.fire_resume_connection
+          @resource.fire_connect @session.session_id
+        else
+          @resource.fire_resume_connection @session.session_id
         end
       end
 
       def receive_data(conn, data)
-        @resource.fire_message(data)
+        @resource.fire_message(@session.session_id, data)
       end
 
       def close(conn)
-        @resource.fire_close
+        @resource.fire_close @session.session_id
       end
 
       def unbind(conn)
@@ -74,11 +74,11 @@ module Palmade::SocketIoRack
         # mark as disconnected
         @connected = false
         @conn = nil
-        @resource.fire_disconnected
+        @resource.fire_disconnected @session.session_id
       end
 
       def heartbeat(cycle_count)
-        @resource.fire_heartbeat(cycle_count)
+        @resource.fire_heartbeat(@session.session_id, cycle_count)
       end
 
       protected

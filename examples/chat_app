@@ -19,14 +19,29 @@ require 'palmade/socket_io_rack'
 Thin.send(:include, Palmade::SocketIoRack::Mixins::Thin)
 
 class Chat < Palmade::SocketIoRack::Base
-  def on_connect
+  def initialize(options = {})
+    super(options)
+    @buffer = []
+  end
+
+  def on_connect(sid)
     EM.add_timer(1) do
-      reply({:buffer => [{:announcement => 'Welcome to the chat room'}]}.to_json)
+      reply(sid, {:buffer => @buffer}.to_json)
+      broadcast({:announcement => "#{sid} has joined the chat room"}.to_json)
     end
   end
 
-  def on_message(msg)
-    reply({:message => [@session.session_id, msg]}.to_json)
+  def on_message(sid, msg)
+    message = {:message => [sid, msg]}
+    @buffer << message
+    @buffer.shift if @buffer.count > 15
+    send_to = @sessions.keys
+    send_to.delete sid
+    multicast send_to, message.to_json
+  end
+
+  def on_disconnected(sid)
+    broadcast({:announcement => "#{sid} has left the chat room (disconnected)"}.to_json)
   end
 end
 

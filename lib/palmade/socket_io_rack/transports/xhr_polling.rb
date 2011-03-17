@@ -28,7 +28,7 @@ module Palmade::SocketIoRack
         session = setup_session(transport_options, persistence)
 
         if !session.nil?
-          @resource.initialize_session!(@session = session)
+          @resource.initialize_session!(self, @session = session)
 
           case env[CREQUEST_METHOD]
           when CPOST

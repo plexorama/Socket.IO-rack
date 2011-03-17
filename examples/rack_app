@@ -16,18 +16,18 @@ require 'palmade/socket_io_rack'
 Thin.send(:include, Palmade::SocketIoRack::Mixins::Thin)
 
 class Firehose < Palmade::SocketIoRack::Base
-  def on_connect
+  def on_connect(sid)
     EM.add_timer(30) do
-      reply "This message should show-up 30 secs later"
+      reply sid, "This message should show-up 30 secs later"
     end
 
     EM.add_timer(60) do
-      reply "This message should show-up 60 secs later"
+      reply sid, "This message should show-up 60 secs later"
     end
   end
 
-  def on_message(msg)
-    reply "Hello #{msg}"
+  def on_message(sid, msg)
+    reply sid, "Hello #{msg}"
   end
 end
 

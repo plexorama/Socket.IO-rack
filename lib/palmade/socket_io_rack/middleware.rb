@@ -109,8 +109,7 @@ module Palmade::SocketIoRack
                                    transport,
                                    transport_options)
 
-        performed, response = resource.
-          initialize_transport!(Cwebsocket).handle_request(env, transport_options, persistence)
+        performed, response = resource.handle_request env, Cwebsocket, transport_options, persistence
       end
 
       [ performed, response ]
@@ -125,8 +124,7 @@ module Palmade::SocketIoRack
                                    transport,
                                    transport_options)
 
-        performed, response = resource.
-          initialize_transport!(Cxhrpolling).handle_request(env, transport_options, persistence)
+        performed, response = resource.handle_request env, Cxhrpolling, transport_options, persistence
       end
 
       [ performed, response ]
@@ -141,8 +139,7 @@ module Palmade::SocketIoRack
                                    transport,
                                    transport_options)
 
-        performed, response = resource.
-          initialize_transport!(Cxhrmultipart).handle_request(env, transport_options, persistence)
+        performed, response = resource.handle_request env, Cxhrmultipart, transport_options, persistence
       end
 
       [ performed, response ]
@@ -179,8 +176,10 @@ module Palmade::SocketIoRack
         rsc, rsc_options = rpath_options[0], rpath_options[1]
       when Hash
         rsc, rsc_options = rpath_options[:resource], rpath_options[:resource_options]
+      when Base
+        return rpath_options
       else
-        raise "Unsupported rpath_options #{rpath} #{rpath_options.inspect}"
+        raise "Unsupported rpath_options #{rpath}, #{rpath_options.class}, #{rpath_options.inspect}"
       end
 
       case rsc
@@ -195,6 +194,7 @@ module Palmade::SocketIoRack
         raise "Unsupported web socket handler #{ws_handler.inspect}"
       end
 
+      @resources[rpath] = resource
       resource
     end
   end
