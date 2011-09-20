@@ -2,6 +2,10 @@
 
 Super alpha, super experimental, not to be used yet for real work, unless you want to hack in to the code and help me get it to production ready. :)
 
+- added WebSockets 8 (hybi-10) framing support 
+- runs with Google Chrome v13 and v14+ beta and Firefox 6 
+
+
 *REQUIREMENTS*
 
 You need the following gems:
