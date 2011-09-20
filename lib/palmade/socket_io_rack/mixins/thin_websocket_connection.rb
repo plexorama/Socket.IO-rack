@@ -1,5 +1,8 @@
 # -*- encoding: binary -*-
 
+require "digest"
+require "base64"
+
 module Palmade::SocketIoRack
   module Mixins
     module ThinWebSocketConnection
@@ -48,10 +51,14 @@ module Palmade::SocketIoRack
       CSecWebSocketOrigin = "Sec-WebSocket-Origin".freeze
       CSecWebSocketLocation = "Sec-WebSocket-Location".freeze
       CContentLength = "Content-Length".freeze
-
+      CSecWebSocketAccept = "Sec-WebSocket-Accept".freeze
+ 
       CHTTP_ORIGIN = "HTTP_ORIGIN".freeze
       CHTTP_SEC_WEBSOCKET_KEY1 = "HTTP_SEC_WEBSOCKET_KEY1".freeze
       CHTTP_SEC_WEBSOCKET_KEY2 = "HTTP_SEC_WEBSOCKET_KEY2".freeze
+      CHTTP_SEC_WEBSOCKET_KEY = "HTTP_SEC_WEBSOCKET_KEY".freeze
+      CHTTP_SEC_WEBSOCKET_ORIGIN = "HTTP_SEC_WEBSOCKET_ORIGIN".freeze
+      CHTTP_SEC_WEBSOCKET_VERSION = "HTTP_SEC_WEBSOCKET_VERSION".freeze
 
       Cws_handler = "ws_handler".freeze
       Cws_close_message = "\xff\x00".freeze
@@ -120,18 +127,58 @@ module Palmade::SocketIoRack
         self
       end
 
+      def inframer
+        @inframer ||= Palmade::SocketIoRack::WebSocketFrame.new
+      end
+
+      def outframer
+        @outframer ||= Palmade::SocketIoRack::WebSocketFrame.new
+	@outframer.opcode = 1
+        @outframer.fin = true
+        @outframer
+      end
+
       def receive_data_websocket(data)
         trace { "WS RCV: #{data}" }
+        #p [ "WS RCV:", data ]
 
-        if data =~ Cws_regex_message
-          @ws_handler.receive_data(self, $1)
-        elsif data == Cws_close_message # closing
-          @ws_handler.close(self)
-          terminate_websocket
+        if @ws_version == "8"
+          if !inframer.process(data)
+            #p ["process returned false", inframer.parseState, inframer.protocolError ]
+            if inframer.protocolError
+              raise "protocol error: #{inframer.dropReason}" 
+              @inframer = nil
+            end
+            #p [ "waiting for more data..." ]
+            return 
+          elsif inframer.parseState == :complete
+            inframer.parseState = :decode_header  
+            data = inframer.binaryPayload
+          else
+            #p [ "WHOAAH!! whats that?? ", inframer.parseState ]
+            raise "protocol error: unexpected state -> #{inframer.parseState} "
+          end
+          
+          @ws_handler.receive_data(self, data) if !data.empty?
+
+          if inframer.opcode == 8
+            @ws_handler.close(self)
+            terminate_websocket
+          end
+          
         else
-          raise "Invalid data for web socket"
+          if data =~ Cws_regex_message
+            @ws_handler.receive_data(self, $1)
+          elsif data == Cws_close_message # closing
+            @ws_handler.close(self)
+            terminate_websocket
+          else
+            raise "Invalid data for web socket"
+          end
         end
       rescue Exception => e
+        #p [ "exception", e.message ]
+        #p [ e.backtrace.join("\n") ]
         log "!!! Exception in receive_data for websocket"
         log_error e
         close_connection
@@ -140,13 +187,24 @@ module Palmade::SocketIoRack
       if ::Thin.ruby_18?
         def send_data_websocket(data)
           trace { "WS SND: #{data}" }
-          send_data(Cws_frame_message % data)
+          if @ws_version == "8"
+	    send_data outframer.frame(data)
+	  else
+            send_data(Cws_frame_message % data)
+          end
         end
       else
         def send_data_websocket(data)
           trace { "WS SND: #{data}" }
           data = data.dup.force_encoding(Cbinary) if RUBY_VERSION >= "1.9"
-          send_data(Cws_frame_message % data)
+          if @ws_version == "8"
+            #p [ "ws_version 8 framing", data, outframer ]
+            data = outframer.frame(data)
+            #p [ "-> v8", data ]
+            send_data( data )
+          else
+            send_data(Cws_frame_message % data)
+          end
         end
       end
 
@@ -187,21 +245,32 @@ module Palmade::SocketIoRack
 
           sec_key1 = request.env[CHTTP_SEC_WEBSOCKET_KEY1]
           sec_key2 = request.env[CHTTP_SEC_WEBSOCKET_KEY2]
+          sec_key = request.env[CHTTP_SEC_WEBSOCKET_KEY]
+          sec_ver = request.env[CHTTP_SEC_WEBSOCKET_VERSION]
 
-          request.body.rewind
-          sec_key3 = request.body.read
+          if sec_ver == "8" && !sec_key.nil? then
+            string_to_sign = "#{sec_key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+            sec_digest = Base64.encode64( Digest::SHA1.digest( string_to_sign ) ).chomp
+            headers[CSecWebSocketAccept] = sec_digest
+            headers[CSecWebSocketOrigin] = request.env[CHTTP_SEC_WEBSOCKET_ORIGIN]
+            @ws_version = sec_ver
+            result[2] = []
+          else
 
-          sec_digest = websocket_security_digest(sec_key1, sec_key2, sec_key3)
+            request.body.rewind
+            sec_key3 = request.body.read
+  
+            sec_digest = websocket_security_digest(sec_key1, sec_key2, sec_key3)
+            #puts "SEC1: #{sec_key1.inspect}"
+            #puts "SEC2: #{sec_key2.inspect}"
+            #puts "SEC3: #{sec_key3.inspect}"
+            #puts "SECD: #{sec_digest.inspect}"
 
-          #puts "SEC1: #{sec_key1.inspect}"
-          #puts "SEC2: #{sec_key2.inspect}"
-          #puts "SEC3: #{sec_key3.inspect}"
-          #puts "SECD: #{sec_digest.inspect}"
+            headers[CContentLength] = sec_digest.size.to_s
 
-          headers[CContentLength] = sec_digest.size.to_s
-
-          # now, replace the body with our digest
-          result[2] = sec_digest
+            # now, replace the body with our digest
+            result[2] = sec_digest
+          end
         end
 
         @ws_state = :connecting
