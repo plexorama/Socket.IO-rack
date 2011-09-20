@@ -3,6 +3,7 @@
 Running in production enviroment, altough there are no major difficulties, the code might still require some debugging. The project can be considered BETA quality. 
 
 
+*RECENT CHANGES*
 
 - added WebSockets 8 (hybi-10) framing support 
 - runs with Google Chrome v13 and v14+ beta and Firefox 6 
