@@ -114,7 +114,7 @@ module Palmade::SocketIoRack
       performed = false
       response = nil
 
-      if env[CHTTP_UPGRADE] == CWebSocket &&
+      if !env[CHTTP_UPGRADE].nil? && env[CHTTP_UPGRADE].downcase == Cwebsocket &&
           env[CHTTP_CONNECTION] == CUpgrade
 
         resource = create_resource(rpath,
